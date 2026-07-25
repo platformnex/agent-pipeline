@@ -55,5 +55,5 @@ jobs:
             then add the label "status:plan-review":
               gh issue edit ${{ github.event.issue.number }} --remove-label "status:needs-plan" --remove-label "status:plan-review" --add-label "status:plan-review"
           claude_args: |
-            --allowedTools "Bash(gh issue view:*),Bash(gh issue comment:*),Bash(gh issue edit:*)"
-            --max-turns 6
+            --allowedTools "Write,Bash(gh issue view:*),Bash(gh issue comment:*),Bash(gh issue edit:*)"
+            --max-turns 12

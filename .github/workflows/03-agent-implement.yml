@@ -75,4 +75,4 @@ jobs:
             back, and stop without opening a PR.
           claude_args: |
             --allowedTools "Read,Write,Edit,Bash,Bash(gh issue view:*),Bash(gh issue edit:*),Bash(gh issue comment:*),Bash(gh pr create:*),Bash(git:*)"
-            --max-turns 40
+            --max-turns 60

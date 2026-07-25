@@ -60,4 +60,4 @@ jobs:
               gh pr edit ${{ github.event.pull_request.number }} --remove-label "status:tests-passed" --add-label "status:changes-requested"
           claude_args: |
             --allowedTools "Read,Bash"
-            --max-turns 20
+            --max-turns 40

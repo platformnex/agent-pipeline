@@ -26,7 +26,7 @@ copy-paste drift across repos.
 4. **Create org-level secrets/variables once** (org Settings → Secrets and
    variables → Actions), scoped to "selected repositories" = hub + every
    consumer repo you onboard. See Part 2 for how to generate the values:
-   - Secret `ANTHROPIC_API_KEY`
+   - Secret `CLAUDE_CODE_OAUTH_TOKEN`
    - Secret `GH_AUTOMATION_TOKEN`
    - (Optional, only if syncing Projects v2) Variables `PROJECT_OWNER`,
      `PROJECT_NUMBER`, and if they differ from the defaults,
@@ -36,19 +36,27 @@ copy-paste drift across repos.
 
 ## Part 2 — Generating the tokens
 
-### `ANTHROPIC_API_KEY`
+### `CLAUDE_CODE_OAUTH_TOKEN`
 
-1. Go to https://console.anthropic.com.
-2. Create a dedicated **Workspace** for this automation (e.g. "github-agent-pipeline")
-   rather than reusing a personal one — isolates cost/usage and makes it a
-   one-click revoke if something misbehaves across many repos.
-3. In that workspace: Settings → API Keys → Create Key. Name it
-   `github-actions-agent-pipeline`.
-4. If your plan supports it, set a spend limit / budget alert on the
-   workspace — autonomous agents across N repos can burn through quota
-   faster than a human would notice.
-5. Copy the key once, store it as the org secret `ANTHROPIC_API_KEY` (Part 1,
-   step 4).
+This pipeline authenticates against your Claude subscription (Pro/Max/Team/
+Enterprise) rather than a separate pay-as-you-go Anthropic API key, so there's
+no console.anthropic.com key to create.
+
+1. In a real terminal (not through an agent — this mints a long-lived
+   credential and shouldn't pass through any chat transcript):
+   ```
+   claude setup-token
+   ```
+2. It walks you through browser auth against your Claude account and prints
+   a token once. Copy it directly into the org secret `CLAUDE_CODE_OAUTH_TOKEN`
+   (Part 1, step 4) — don't paste it anywhere else.
+3. The token is long-lived (about a year) and tied to your subscription's
+   usage/rate limits, which are shared with your interactive Claude Code
+   sessions — this pipeline's agent traffic across every consumer repo counts
+   against the same limits, not a separate pool. If that traffic grows
+   significant, consider a dedicated `ANTHROPIC_API_KEY` instead (pay-as-you-go,
+   isolated limits): swap the `CLAUDE_CODE_OAUTH_TOKEN` env var for
+   `ANTHROPIC_API_KEY` in each hub workflow's `claude-code-action` step.
 
 ### `GH_AUTOMATION_TOKEN` — fine-grained PAT
 
@@ -101,7 +109,7 @@ Repeat for each repo:
    the `claude-code-action` steps; the PAT is what lets bot actions chain
    workflows.)
 4. If you did org-level secrets/variables in Part 1, nothing to do here. If
-   this repo is outside that scope, add `ANTHROPIC_API_KEY` and
+   this repo is outside that scope, add `CLAUDE_CODE_OAUTH_TOKEN` and
    `GH_AUTOMATION_TOKEN` as repo-level secrets instead.
 5. From the repo's **Actions** tab, run "Agent Pipeline: Setup Labels" once
    (`workflow_dispatch`) to create the label set.

@@ -34,7 +34,7 @@ many repos pick it up automatically.
 **Full setup and token-generation steps are in [SETUP.md](SETUP.md).**
 Short version:
 
-1. Push this repo, wire up org-level secrets (`ANTHROPIC_API_KEY`,
+1. Push this repo, wire up org-level secrets (`CLAUDE_CODE_OAUTH_TOKEN`,
    `GH_AUTOMATION_TOKEN`), install the Claude GitHub App.
 2. For each existing repo you're onboarding: copy `templates/consumer-repo/`
    in, fill in its `.claude/pipeline.config.yml` with real build/test

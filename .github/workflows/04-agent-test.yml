@@ -37,7 +37,11 @@ jobs:
             You are the TESTER agent in an automated spec-driven development pipeline,
             running against PR #${{ github.event.pull_request.number }}.
 
-            1. Read `.claude/pipeline.config.yml` for the install/build/test commands.
+            1. Read `.claude/pipeline.config.yml` for the install/build/test commands,
+               protected_paths, and an optional `guardrails` section — treat every
+               listed guardrail as a hard constraint on anything you do here too
+               (e.g. don't work around a "no real external calls in tests" guardrail
+               by pointing a test at a live resource).
             2. Run install, then test. If tests fail, read the failures and fix the
                *source or test* code (whichever is actually wrong) — don't weaken
                assertions just to make them pass. Re-run until green or until you're
@@ -51,7 +55,9 @@ jobs:
               gh pr comment ${{ github.event.pull_request.number }} --body "Tests passing. Summary: ..."
               gh pr edit ${{ github.event.pull_request.number }} --remove-label "status:tests-failed" --add-label "status:tests-passed"
 
-            If tests still fail after your fix attempts:
+            If tests still fail after your fix attempts, OR if getting them to pass
+            would require violating a guardrail, do NOT work around the guardrail —
+            explain the conflict explicitly instead:
               gh pr comment ${{ github.event.pull_request.number }} --body "Tests failing. Details: ... What's needed: ..."
               gh pr edit ${{ github.event.pull_request.number }} --add-label "status:tests-failed"
           claude_args: |

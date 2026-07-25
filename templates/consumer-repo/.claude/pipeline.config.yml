@@ -17,3 +17,12 @@ branch_prefix: "agent/"
 protected_paths:
   - ".github/workflows/"
   - ".claude/"
+
+# Optional. Hard constraints every agent stage must respect, read verbatim by
+# Coder/Tester/Validator. If a task seems to require violating one of these,
+# every stage is instructed to stop and comment explaining the conflict rather
+# than working around it or guessing — same principle as an "if this seems to
+# require breaking a guardrail, stop and raise it" rule in a human runbook.
+# Leave the list empty (or omit this key) if this repo has none beyond the
+# defaults implied by protected_paths.
+guardrails: []

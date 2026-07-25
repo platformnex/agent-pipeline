@@ -4,7 +4,7 @@ name: "Agent Pipeline: 1. Plan"
 
 on:
   issues:
-    types: [opened, labeled, reopened]
+    types: [labeled, reopened]
   issue_comment:
     types: [created]
 
@@ -16,7 +16,8 @@ permissions:
 jobs:
   call:
     if: >
-      (github.event_name == 'issues' && contains(github.event.issue.labels.*.name, 'status:needs-plan')) ||
+      (github.event_name == 'issues' && github.event.action == 'labeled' && github.event.label.name == 'status:needs-plan') ||
+      (github.event_name == 'issues' && github.event.action == 'reopened' && contains(github.event.issue.labels.*.name, 'status:needs-plan')) ||
       (github.event_name == 'issue_comment' &&
        contains(github.event.issue.labels.*.name, 'status:plan-review') &&
        startsWith(github.event.comment.body, '/revise-plan') &&

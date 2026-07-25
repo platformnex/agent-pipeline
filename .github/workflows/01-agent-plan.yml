@@ -31,6 +31,7 @@ jobs:
         env:
           CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
         with:
+          allowed_bots: "claude[bot]"
           prompt: |
             You are the PLANNER agent in an automated spec-driven development pipeline.
             Read issue #${{ github.event.issue.number }} (use `gh issue view ${{ github.event.issue.number }} --comments`

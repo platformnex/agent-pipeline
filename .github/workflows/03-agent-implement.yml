@@ -37,6 +37,7 @@ jobs:
           CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           GH_TOKEN: ${{ secrets.GH_AUTOMATION_TOKEN }}
         with:
+          allowed_bots: "claude[bot]"
           prompt: |
             You are the CODER agent in an automated spec-driven development pipeline.
             You have no memory of prior steps — reconstruct context yourself:

@@ -1,0 +1,19 @@
+# CALLER workflow — copy into a consumer repo as-is.
+# Replace platformnex/agent-pipeline with this hub repo's actual path once pushed.
+name: "Agent Pipeline: 2. Plan Approval Gate"
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  issues: write
+
+jobs:
+  call:
+    if: >
+      contains(github.event.issue.labels.*.name, 'status:plan-review') &&
+      startsWith(github.event.comment.body, '/approve-plan') &&
+      github.event.sender.login != 'github-actions[bot]'
+    uses: platformnex/agent-pipeline/.github/workflows/02-agent-plan-approval.yml@main
+    secrets: inherit

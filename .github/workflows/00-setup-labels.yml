@@ -1,0 +1,37 @@
+name: "Reusable: Setup Labels"
+
+# Reusable workflow — lives in the hub repo, called from a thin
+# workflow_dispatch caller in each consumer repo. See templates/consumer-repo/.
+# Idempotent: safe to re-run.
+on:
+  workflow_call: {}
+
+permissions:
+  issues: write
+
+jobs:
+  create-labels:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create pipeline labels
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -e
+          declare -A LABELS=(
+            ["spec"]="0e8a16:A spec-driven ticket for the agent pipeline"
+            ["status:needs-plan"]="fbca04:Waiting on the Planner agent"
+            ["status:plan-review"]="fbca04:Plan posted, waiting on PM approval"
+            ["status:ready-for-dev"]="1d76db:Plan approved, waiting on the Coder agent"
+            ["status:in-review"]="1d76db:PR open, moving through test/validate"
+            ["status:tests-failed"]="d73a4a:Tester agent found failures"
+            ["status:tests-passed"]="0e8a16:Tests green, waiting on Validator agent"
+            ["status:ready-to-merge"]="0e8a16:Validator approved, waiting on human merge"
+            ["status:changes-requested"]="d73a4a:Validator requested changes"
+            ["agent-generated"]="5319e7:Branch/PR authored by the agent pipeline"
+          )
+          for name in "${!LABELS[@]}"; do
+            color="${LABELS[$name]%%:*}"
+            desc="${LABELS[$name]#*:}"
+            gh label create "$name" --color "$color" --description "$desc" --force
+          done

@@ -1,0 +1,57 @@
+name: "Reusable: 4. Test"
+
+# Reusable workflow, called from each consumer repo's pull_request caller.
+on:
+  workflow_call:
+    secrets:
+      ANTHROPIC_API_KEY:
+        required: true
+      GH_AUTOMATION_TOKEN:
+        required: true
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+jobs:
+  test:
+    if: contains(github.event.pull_request.labels.*.name, 'agent-generated')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          token: ${{ secrets.GH_AUTOMATION_TOKEN }}
+          fetch-depth: 0
+
+      - name: Run Tester agent
+        uses: anthropics/claude-code-action@v1
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GH_TOKEN: ${{ secrets.GH_AUTOMATION_TOKEN }}
+        with:
+          prompt: |
+            You are the TESTER agent in an automated spec-driven development pipeline,
+            running against PR #${{ github.event.pull_request.number }}.
+
+            1. Read `.claude/pipeline.config.yml` for the install/build/test commands.
+            2. Run install, then test. If tests fail, read the failures and fix the
+               *source or test* code (whichever is actually wrong) — don't weaken
+               assertions just to make them pass. Re-run until green or until you're
+               confident the failure is a genuine spec ambiguity, not a bug you can fix.
+            3. If coverage of the acceptance criteria (see the linked issue) looks thin,
+               add the missing test cases yourself.
+
+            Commit and push any changes you make to this branch.
+
+            If tests end up passing:
+              gh pr comment ${{ github.event.pull_request.number }} --body "Tests passing. Summary: ..."
+              gh pr edit ${{ github.event.pull_request.number }} --remove-label "status:tests-failed" --add-label "status:tests-passed"
+
+            If tests still fail after your fix attempts:
+              gh pr comment ${{ github.event.pull_request.number }} --body "Tests failing. Details: ... What's needed: ..."
+              gh pr edit ${{ github.event.pull_request.number }} --add-label "status:tests-failed"
+          claude_args: |
+            --allowedTools "Read,Write,Edit,Bash,Bash(gh pr comment:*),Bash(gh pr edit:*),Bash(git:*)"
+            --max-turns 30

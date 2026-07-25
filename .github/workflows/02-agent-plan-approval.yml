@@ -1,0 +1,49 @@
+name: "Reusable: 2. Plan Approval Gate"
+
+# Reusable workflow, called from each consumer repo's issue_comment caller.
+# Pure gate, no Claude call. A human (the PM, or anyone with write access)
+# comments "/approve-plan" on the issue. This flips the label that
+# 03-agent-implement.yml listens for.
+#
+# IMPORTANT: this must run with GH_AUTOMATION_TOKEN (a PAT or GitHub App
+# token), not the default GITHUB_TOKEN. Labels added via GITHUB_TOKEN do not
+# trigger other workflows (GitHub's anti-recursion rule), which would silently
+# stall the pipeline right here. See SETUP.md "Why a separate automation token".
+on:
+  workflow_call:
+    secrets:
+      GH_AUTOMATION_TOKEN:
+        required: true
+
+permissions:
+  issues: write
+
+jobs:
+  approve:
+    if: >
+      contains(github.event.issue.labels.*.name, 'status:plan-review') &&
+      startsWith(github.event.comment.body, '/approve-plan') &&
+      github.event.sender.login != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify commenter has write access
+        id: perm
+        env:
+          GH_TOKEN: ${{ secrets.GH_AUTOMATION_TOKEN }}
+        run: |
+          level=$(gh api repos/${{ github.repository }}/collaborators/${{ github.event.comment.user.login }}/permission --jq .permission)
+          echo "level=$level"
+          if [[ "$level" != "admin" && "$level" != "write" ]]; then
+            echo "Commenter lacks write access ($level); ignoring /approve-plan."
+            exit 1
+          fi
+
+      - name: Advance to ready-for-dev
+        env:
+          GH_TOKEN: ${{ secrets.GH_AUTOMATION_TOKEN }}
+        run: |
+          gh issue edit ${{ github.event.issue.number }} \
+            --remove-label "status:plan-review" \
+            --add-label "status:ready-for-dev"
+          gh issue comment ${{ github.event.issue.number }} \
+            --body "Plan approved by @${{ github.event.comment.user.login }}. Kicking off the Coder agent."

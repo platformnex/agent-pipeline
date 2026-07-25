@@ -1,0 +1,18 @@
+# CALLER workflow — copy into a consumer repo as-is.
+# Replace platformnex/agent-pipeline with this hub repo's actual path once pushed.
+name: "Agent Pipeline: 6. Close Out"
+
+on:
+  pull_request:
+    types: [closed]
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: read
+
+jobs:
+  call:
+    if: github.event.pull_request.merged == true && contains(github.event.pull_request.labels.*.name, 'agent-generated')
+    uses: platformnex/agent-pipeline/.github/workflows/06-close-out.yml@main
+    secrets: inherit

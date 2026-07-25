@@ -1,0 +1,72 @@
+name: "Feature / Change Spec"
+description: "Spec-driven ticket. Filling this out kicks off the agent pipeline: Plan -> your approval -> Code -> Test -> Validate."
+title: "[Spec]: "
+labels: ["spec", "status:needs-plan"]
+projects: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Fill this out as completely as possible. The **Planner agent** reads this
+        exact form to break the work into tasks — vague input produces a vague plan.
+        You'll get a chance to approve or send back the plan before any code is written.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem / Motivation
+      description: What's broken, missing, or costly today? Who is affected?
+      placeholder: "Support agents currently have to manually cross-reference three dashboards to answer a billing question..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: goal
+    attributes:
+      label: Goal
+      description: What should be true once this ships? One or two sentences.
+    validations:
+      required: true
+
+  - type: textarea
+    id: non_goals
+    attributes:
+      label: Non-goals (optional)
+      description: Explicitly out of scope, to keep the agent from wandering.
+    validations:
+      required: false
+
+  - type: textarea
+    id: acceptance_criteria
+    attributes:
+      label: Acceptance Criteria
+      description: Bullet list. These become the checklist the Validator agent grades the PR against.
+      placeholder: |
+        - [ ] Given X, when Y, then Z
+        - [ ] Existing behavior for ... is unchanged
+        - [ ] Errors are surfaced to the user as ...
+      value: |
+        - [ ]
+    validations:
+      required: true
+
+  - type: textarea
+    id: constraints
+    attributes:
+      label: Constraints / Context
+      description: Relevant files, APIs, deadlines, tech restrictions, design links.
+    validations:
+      required: false
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority
+      options:
+        - P0 - Urgent
+        - P1 - High
+        - P2 - Normal
+        - P3 - Low
+      default: 2
+    validations:
+      required: true

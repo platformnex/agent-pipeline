@@ -1,0 +1,18 @@
+# CALLER workflow — copy into a consumer repo as-is.
+# Replace platformnex/agent-pipeline with this hub repo's actual path once pushed.
+name: "Agent Pipeline: 3. Implement"
+
+on:
+  issues:
+    types: [labeled]
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+jobs:
+  call:
+    if: github.event.label.name == 'status:ready-for-dev'
+    uses: platformnex/agent-pipeline/.github/workflows/03-agent-implement.yml@main
+    secrets: inherit

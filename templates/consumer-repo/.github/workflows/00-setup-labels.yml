@@ -1,0 +1,13 @@
+# CALLER workflow — copy into a consumer repo as-is.
+# Replace platformnex/agent-pipeline with this hub repo's actual path once pushed.
+name: "Agent Pipeline: Setup Labels"
+
+on:
+  workflow_dispatch: {}
+
+permissions:
+  issues: write
+
+jobs:
+  call:
+    uses: platformnex/agent-pipeline/.github/workflows/00-setup-labels.yml@main

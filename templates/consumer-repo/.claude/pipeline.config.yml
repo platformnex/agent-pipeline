@@ -1,0 +1,19 @@
+# Read by every agent stage before it runs build/test/lint commands.
+# Fill these in for this repo's actual stack. Keeping commands here (instead of
+# hardcoded in the agent prompts) is what lets the same workflows work across
+# Node, Python, Go, etc. repos without editing .github/workflows/*.
+
+commands:
+  install: "echo 'TODO: set install command, e.g. npm ci / poetry install'"
+  build: "echo 'TODO: set build command, e.g. npm run build'"
+  test: "echo 'TODO: set test command, e.g. npm test -- --ci'"
+  lint: "echo 'TODO: set lint command, e.g. npm run lint'"
+
+# Branch naming for agent-authored work.
+branch_prefix: "agent/"
+
+# Paths the Coder/Tester agents should treat as off-limits even if asked,
+# e.g. infra secrets, CI config, migration history.
+protected_paths:
+  - ".github/workflows/"
+  - ".claude/"

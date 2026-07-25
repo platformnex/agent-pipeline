@@ -1,0 +1,18 @@
+# CALLER workflow — copy into a consumer repo as-is.
+# Replace platformnex/agent-pipeline with this hub repo's actual path once pushed.
+name: "Agent Pipeline: 5. Validate"
+
+on:
+  pull_request:
+    types: [labeled]
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+jobs:
+  call:
+    if: github.event.label.name == 'status:tests-passed'
+    uses: platformnex/agent-pipeline/.github/workflows/05-agent-validate.yml@main
+    secrets: inherit

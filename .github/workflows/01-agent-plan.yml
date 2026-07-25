@@ -1,0 +1,58 @@
+name: "Reusable: 1. Plan"
+
+# Reusable workflow — called from each consumer repo's own
+# issues/issue_comment-triggered caller (see templates/consumer-repo/).
+# github.event here reflects the caller's triggering event (same run).
+on:
+  workflow_call:
+    secrets:
+      ANTHROPIC_API_KEY:
+        required: true
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  plan:
+    if: >
+      (github.event_name == 'issues' && contains(github.event.issue.labels.*.name, 'status:needs-plan')) ||
+      (github.event_name == 'issue_comment' &&
+       contains(github.event.issue.labels.*.name, 'status:plan-review') &&
+       startsWith(github.event.comment.body, '/revise-plan') &&
+       github.event.sender.login != 'github-actions[bot]')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run Planner agent
+        uses: anthropics/claude-code-action@v1
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        with:
+          prompt: |
+            You are the PLANNER agent in an automated spec-driven development pipeline.
+            Read issue #${{ github.event.issue.number }} (use `gh issue view ${{ github.event.issue.number }} --comments`
+            to get the full spec and any "/revise-plan" feedback from the PM).
+
+            Produce a task breakdown and post it as a SINGLE new issue comment
+            (`gh issue comment ${{ github.event.issue.number }} --body-file <file>`) formatted as:
+
+            ## Plan (v<n>)
+            ### Understanding
+            One paragraph restating the goal in your own words, so the PM can catch
+            misunderstandings before code is written.
+            ### Tasks
+            A numbered, dependency-ordered checklist of concrete implementation tasks.
+            ### Open questions
+            Anything ambiguous in the spec that blocks a confident implementation.
+            ### Risk / complexity
+            One line: Small / Medium / Large, and why.
+
+            Do not write or modify any source code in this step. Do not open a PR.
+            When done, remove the label "status:needs-plan" and "status:plan-review" if present,
+            then add the label "status:plan-review":
+              gh issue edit ${{ github.event.issue.number }} --remove-label "status:needs-plan" --remove-label "status:plan-review" --add-label "status:plan-review"
+          claude_args: |
+            --allowedTools "Bash(gh issue view:*),Bash(gh issue comment:*),Bash(gh issue edit:*)"
+            --max-turns 6

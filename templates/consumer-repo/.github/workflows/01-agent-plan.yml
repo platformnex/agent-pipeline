@@ -4,7 +4,7 @@ name: "Agent Pipeline: 1. Plan"
 
 on:
   issues:
-    types: [opened]
+    types: [opened, labeled, reopened]
   issue_comment:
     types: [created]
 

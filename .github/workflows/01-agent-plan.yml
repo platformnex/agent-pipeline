@@ -56,4 +56,4 @@ jobs:
               gh issue edit ${{ github.event.issue.number }} --remove-label "status:needs-plan" --remove-label "status:plan-review" --add-label "status:plan-review"
           claude_args: |
             --allowedTools "Read,Write,Bash"
-            --max-turns 15
+            --max-turns 30

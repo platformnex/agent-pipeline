@@ -15,6 +15,8 @@ flowchart TD
     D -->|"label: status:plan-approved"| S["Splitter agent\n02b-agent-split.yml"]
     S -->|"plan is right-sized\nlabel: status:ready-for-dev"| E["Coder agent\n03-agent-implement.yml"]
     S -->|"plan too large\ncreates child issues\nlabel: status:split"| S2["Tracking issue\n(children re-enter at needs-plan)"]
+    E -->|"ran out of turns\nlabel: status:coder-incomplete"| E2["PM comments /continue"]
+    E2 -->|"resumes Coder on same branch"| E
     E -->|opens PR, label agent-generated| F["Tester agent\n04-agent-test.yml"]
     F -->|"tests green\nlabel: status:tests-passed"| G["Validator agent\n05-agent-validate.yml"]
     F -->|tests still red| F2["label: status:tests-failed\n(human/manual intervention)"]
@@ -63,6 +65,7 @@ default token.
 | `status:split` | Plan was split; this issue now tracks its child issues | Splitter agent |
 | `split-child` | Marks an issue created by the Splitter from a larger parent | Splitter agent |
 | `status:ready-for-dev` | Plan approved and right-sized for one Coder run | Splitter agent |
+| `status:coder-incomplete` | Coder ran out of turns before finishing; `/continue` resumes it | Coder agent |
 | `status:in-review` | PR open, moving through test/validate | Coder agent |
 | `status:tests-failed` | Tester couldn't get to green | Tester agent |
 | `status:tests-passed` | Tests green, awaiting validation | Tester agent |
@@ -75,6 +78,9 @@ default token.
 - `/approve-plan` (comment on the issue) — unblocks the Coder agent.
 - `/revise-plan <what's wrong>` (comment on the issue, while in
   `status:plan-review`) — sends it back to the Planner with your feedback.
+- `/continue` (comment on the issue, while in `status:coder-incomplete`) —
+  re-runs the Coder on the same `agent/issue-N` branch, picking up from
+  whatever it already committed instead of starting over.
 
 ## Adding more agents
 

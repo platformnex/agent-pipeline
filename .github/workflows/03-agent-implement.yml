@@ -17,7 +17,12 @@ permissions:
 
 jobs:
   implement:
-    if: github.event.label.name == 'status:ready-for-dev'
+    if: >
+      (github.event_name == 'issues' && github.event.action == 'labeled' && github.event.label.name == 'status:ready-for-dev') ||
+      (github.event_name == 'issue_comment' &&
+       contains(github.event.issue.labels.*.name, 'status:coder-incomplete') &&
+       startsWith(github.event.comment.body, '/continue') &&
+       github.event.sender.login != 'github-actions[bot]')
     runs-on: ubuntu-latest
     steps:
       # Checked out with the automation token (not GITHUB_TOKEN) so the PR
@@ -27,11 +32,36 @@ jobs:
           token: ${{ secrets.GH_AUTOMATION_TOKEN }}
           fetch-depth: 0
 
-      - name: Create working branch
+      # issue_comment fires for anyone who can comment, unlike the labeled
+      # event (which already requires write/triage access to apply a label).
+      # Gate /continue the same way 02-agent-plan-approval.yml gates /approve-plan.
+      - name: Verify commenter has write access
+        if: github.event_name == 'issue_comment'
+        env:
+          GH_TOKEN: ${{ secrets.GH_AUTOMATION_TOKEN }}
+          GH_REPO: ${{ github.repository }}
         run: |
-          git checkout -b "agent/issue-${{ github.event.issue.number }}"
+          level=$(gh api repos/${{ github.repository }}/collaborators/${{ github.event.comment.user.login }}/permission --jq .permission)
+          echo "level=$level"
+          if [[ "$level" != "admin" && "$level" != "write" ]]; then
+            echo "Commenter lacks write access ($level); ignoring /continue."
+            exit 1
+          fi
+
+      - name: Create or resume working branch
+        run: |
+          BRANCH="agent/issue-${{ github.event.issue.number }}"
+          if git ls-remote --exit-code --heads origin "$BRANCH" >/dev/null 2>&1; then
+            echo "Branch $BRANCH already exists on origin — resuming a previous run."
+            git fetch origin "$BRANCH"
+            git checkout "$BRANCH"
+          else
+            echo "Branch $BRANCH doesn't exist yet — starting fresh."
+            git checkout -b "$BRANCH"
+          fi
 
       - name: Run Coder agent
+        id: coder
         uses: anthropics/claude-code-action@v1
         env:
           CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
@@ -48,9 +78,14 @@ jobs:
                protected_paths, and an optional `guardrails` section — never touch
                protected_paths, and treat every listed guardrail as a hard constraint,
                not a suggestion.
+            3. `git log --oneline main..HEAD` on this branch (`agent/issue-${{ github.event.issue.number }}`,
+               already checked out). If this is a fresh run there will be nothing here.
+               If it's non-empty, a previous Coder run already made progress and ran out
+               of turns before finishing — read those commits (and `git diff main..HEAD`
+               if needed) to see which plan tasks are already done, and continue with
+               what's left. Don't redo or re-review already-committed work turn-for-turn.
 
-            Implement every task in the plan's "Tasks" section on this branch
-            (`agent/issue-${{ github.event.issue.number }}`, already checked out).
+            Implement every task in the plan's "Tasks" section on this branch.
             Run the install/build commands from pipeline.config.yml as you go to catch
             errors early. Write tests for new behavior — don't leave that entirely to
             the Tester agent downstream.
@@ -70,27 +105,33 @@ jobs:
                 --label "agent-generated"
 
             Then update the issue:
-              gh issue edit ${{ github.event.issue.number }} --remove-label "status:ready-for-dev" --add-label "status:in-review"
+              gh issue edit ${{ github.event.issue.number }} --remove-label "status:ready-for-dev" --remove-label "status:coder-incomplete" --add-label "status:in-review"
 
             If the plan is unimplementable as written (missing info, contradictions),
             OR if implementing it as written would require violating a guardrail from
             pipeline.config.yml, do NOT guess and do NOT work around the guardrail —
             instead comment on the issue explaining exactly what's blocking you (naming
-            the specific guardrail if that's the reason), add label "status:plan-review"
-            back, and stop without opening a PR.
+            the specific guardrail if that's the reason), then:
+              gh issue edit ${{ github.event.issue.number }} --remove-label "status:ready-for-dev" --remove-label "status:coder-incomplete" --add-label "status:plan-review"
+            and stop without opening a PR.
           claude_args: |
             --allowedTools "Read,Write,Edit,Bash,Bash(gh issue view:*),Bash(gh issue edit:*),Bash(gh issue comment:*),Bash(gh pr create:*),Bash(git:*)"
             --max-turns 60
 
-      # Runs only if the Coder step above failed (e.g. hit --max-turns without
-      # opening a PR). Without this, the issue is left on status:ready-for-dev
-      # with no comment and no label change — just a red Action run a human
-      # has to notice on their own.
+      # Runs only if the Coder step itself failed (e.g. hit --max-turns without
+      # opening a PR) — checked via steps.coder.conclusion, not a bare failure(),
+      # so an unauthorized /continue rejected by the permission check above
+      # doesn't also trigger this and misreport that the Coder ran. Without this
+      # step, a genuine Coder failure leaves the issue on status:ready-for-dev
+      # with no comment and no label change — just a red Action run a human has
+      # to notice on their own. status:coder-incomplete is what /continue (above,
+      # in this same job's `if:`) looks for to re-run the Coder on the same
+      # branch, picking up from whatever got committed.
       - name: Handle Coder failure
-        if: failure()
+        if: failure() && steps.coder.conclusion == 'failure'
         env:
           GH_TOKEN: ${{ secrets.GH_AUTOMATION_TOKEN }}
         run: |
           git push -u origin "agent/issue-${{ github.event.issue.number }}" || true
-          gh issue comment ${{ github.event.issue.number }} --body "Coder agent did not finish (see the Action run for details — likely hit \`--max-turns\`). Any completed tasks it committed before stopping were pushed to \`agent/issue-${{ github.event.issue.number }}\`, but no PR was opened. Needs a human to continue the branch manually, or the plan split into smaller issues."
-          gh issue edit ${{ github.event.issue.number }} --remove-label "status:ready-for-dev" --add-label "status:plan-review"
+          gh issue comment ${{ github.event.issue.number }} --body "Coder agent did not finish (see the Action run for details — likely hit \`--max-turns\`). Any completed tasks it committed before stopping were pushed to \`agent/issue-${{ github.event.issue.number }}\`, but no PR was opened. Comment \`/continue\` to resume the Coder on the same branch from where it left off, or split the plan into smaller issues manually."
+          gh issue edit ${{ github.event.issue.number }} --remove-label "status:ready-for-dev" --add-label "status:coder-incomplete"

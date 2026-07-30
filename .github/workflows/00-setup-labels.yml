@@ -27,6 +27,7 @@ jobs:
             ["status:split"]="bfdadc:Plan was split into smaller child issues; this issue now tracks them"
             ["split-child"]="d4c5f9:Issue created by the Splitter agent from a larger parent issue"
             ["status:ready-for-dev"]="1d76db:Plan approved and right-sized, waiting on the Coder agent"
+            ["status:coder-incomplete"]="e99695:Coder ran out of turns before finishing; comment /continue to resume"
             ["status:in-review"]="1d76db:PR open, moving through test/validate"
             ["status:tests-failed"]="d73a4a:Tester agent found failures"
             ["status:tests-passed"]="0e8a16:Tests green, waiting on Validator agent"

@@ -5,6 +5,8 @@ name: "Agent Pipeline: 3. Implement"
 on:
   issues:
     types: [labeled]
+  issue_comment:
+    types: [created]
 
 permissions:
   contents: write
@@ -14,6 +16,11 @@ permissions:
 
 jobs:
   call:
-    if: github.event.label.name == 'status:ready-for-dev'
+    if: >
+      (github.event_name == 'issues' && github.event.action == 'labeled' && github.event.label.name == 'status:ready-for-dev') ||
+      (github.event_name == 'issue_comment' &&
+       contains(github.event.issue.labels.*.name, 'status:coder-incomplete') &&
+       startsWith(github.event.comment.body, '/continue') &&
+       github.event.sender.login != 'github-actions[bot]')
     uses: platformnex/agent-pipeline/.github/workflows/03-agent-implement.yml@main
     secrets: inherit

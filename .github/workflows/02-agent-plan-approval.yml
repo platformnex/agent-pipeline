@@ -3,7 +3,8 @@ name: "Reusable: 2. Plan Approval Gate"
 # Reusable workflow, called from each consumer repo's issue_comment caller.
 # Pure gate, no Claude call. A human (the PM, or anyone with write access)
 # comments "/approve-plan" on the issue. This flips the label that
-# 03-agent-implement.yml listens for.
+# 02b-agent-split.yml listens for, which in turn decides whether to hand off
+# straight to 03-agent-implement.yml or split the plan into smaller issues first.
 #
 # IMPORTANT: this must run with GH_AUTOMATION_TOKEN (a PAT or GitHub App
 # token), not the default GITHUB_TOKEN. Labels added via GITHUB_TOKEN do not
@@ -39,13 +40,13 @@ jobs:
             exit 1
           fi
 
-      - name: Advance to ready-for-dev
+      - name: Advance to plan-approved
         env:
           GH_TOKEN: ${{ secrets.GH_AUTOMATION_TOKEN }}
           GH_REPO: ${{ github.repository }}
         run: |
           gh issue edit ${{ github.event.issue.number }} \
             --remove-label "status:plan-review" \
-            --add-label "status:ready-for-dev"
+            --add-label "status:plan-approved"
           gh issue comment ${{ github.event.issue.number }} \
-            --body "Plan approved by @${{ github.event.comment.user.login }}. Kicking off the Coder agent."
+            --body "Plan approved by @${{ github.event.comment.user.login }}. Checking whether it needs to be split before implementation starts."

@@ -1,0 +1,92 @@
+name: "Reusable: 2b. Split"
+
+# Reusable workflow, called from each consumer repo's issues (labeled) caller.
+# Runs right after a plan is approved (status:plan-approved), before the
+# Coder agent ever sees the issue. Exists because a single big approved plan
+# can hand the Coder more work than fits in its --max-turns budget, burning
+# the whole run with nothing committed. The Splitter decides whether the
+# plan is right-sized for one Coder run; if not, it breaks it into smaller
+# child issues (each going through its own Planner + approval pass) and
+# turns the original issue into a tracking issue instead.
+on:
+  workflow_call:
+    secrets:
+      CLAUDE_CODE_OAUTH_TOKEN:
+        required: true
+      GH_AUTOMATION_TOKEN:
+        required: true
+
+permissions:
+  contents: read
+  issues: write
+  id-token: write
+
+jobs:
+  split:
+    if: github.event.label.name == 'status:plan-approved'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run Splitter agent
+        uses: anthropics/claude-code-action@v1
+        env:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          GH_TOKEN: ${{ secrets.GH_AUTOMATION_TOKEN }}
+        with:
+          allowed_bots: "claude[bot]"
+          prompt: |
+            You are the SPLITTER agent in an automated spec-driven development
+            pipeline. You're running because the PM just approved a plan for
+            issue #${{ github.event.issue.number }}. You have no memory of prior
+            steps — reconstruct context yourself:
+
+            1. `gh issue view ${{ github.event.issue.number }} --comments` to read
+               the original spec and the Planner agent's most recent
+               "## Plan (v<n>)" comment (its Tasks list and Risk/complexity line).
+
+            Decide whether this plan is small enough for one Coder agent run, or
+            should be split into smaller, independently implementable issues first.
+
+            Rule of thumb: keep it as ONE issue if an experienced engineer could
+            implement every task, write tests for it, and land it as a single
+            coherent PR in one sitting. Lean toward splitting if the Tasks section
+            has more than ~5 substantial tasks, the tasks span multiple areas of
+            the codebase that don't need to land together, or the Planner's own
+            Risk/complexity line says Large. When genuinely unsure, don't split —
+            only split when the win is clear, since every split adds a full
+            Planner + human-approval cycle per child issue.
+
+            If you decide NOT to split, just hand off to the Coder as normal:
+              gh issue edit ${{ github.event.issue.number }} --remove-label "status:plan-approved" --add-label "status:ready-for-dev"
+            Do not post a comment in this case — it's the common path and
+            shouldn't add noise to the issue.
+
+            If you decide TO split:
+              - Partition the Tasks section into 2+ groups, each independently
+                implementable and each satisfying the "one sitting" rule of thumb
+                above. Preserve dependency order — if group B's tasks depend on
+                group A's, say so explicitly in B's issue body instead of silently
+                reordering the work.
+              - For each group, create a child issue:
+                  gh issue create --title "<original title> — part <i>/<n>: <short group name>" \
+                    --body-file <file> --label "status:needs-plan" --label "split-child"
+                where the body is a focused, self-contained spec: a one-paragraph
+                goal, the specific tasks from this group (quote them from the
+                plan), acceptance criteria, and a line "Split from #${{ github.event.issue.number }}, part <i> of <n>."
+                Record each created issue's number as you go.
+              - Post ONE comment on issue #${{ github.event.issue.number }} explaining
+                the plan was split and why, with a checklist linking every child
+                issue you created.
+              - gh issue edit ${{ github.event.issue.number }} --remove-label "status:plan-approved" --add-label "status:split"
+              - Leave issue #${{ github.event.issue.number }} open — it now serves as
+                a tracking issue for its children. Nothing auto-closes it; a human
+                closes it once all children have merged.
+
+            Never touch protected_paths from `.claude/pipeline.config.yml` (at minimum
+            `.github/workflows/` and `.claude/`), and do not write or modify any
+            source code, and do not open any PR — this stage only reads the plan and
+            manages issues.
+          claude_args: |
+            --allowedTools "Read,Write,Bash(gh issue view:*),Bash(gh issue comment:*),Bash(gh issue edit:*),Bash(gh issue create:*)"
+            --max-turns 25

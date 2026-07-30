@@ -1,0 +1,18 @@
+# CALLER workflow — copy into a consumer repo as-is.
+# Replace platformnex/agent-pipeline with this hub repo's actual path once pushed.
+name: "Agent Pipeline: 2b. Split"
+
+on:
+  issues:
+    types: [labeled]
+
+permissions:
+  contents: read
+  issues: write
+  id-token: write
+
+jobs:
+  call:
+    if: github.event.label.name == 'status:plan-approved'
+    uses: platformnex/agent-pipeline/.github/workflows/02b-agent-split.yml@main
+    secrets: inherit

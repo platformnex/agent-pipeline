@@ -12,7 +12,9 @@ flowchart TD
     B -->|posts plan comment| C["status:plan-review\n(waiting on PM)"]
     C -->|"PM comments /approve-plan"| D["02-agent-plan-approval.yml"]
     C -->|"PM comments /revise-plan <feedback>"| B
-    D -->|"label: status:ready-for-dev"| E["Coder agent\n03-agent-implement.yml"]
+    D -->|"label: status:plan-approved"| S["Splitter agent\n02b-agent-split.yml"]
+    S -->|"plan is right-sized\nlabel: status:ready-for-dev"| E["Coder agent\n03-agent-implement.yml"]
+    S -->|"plan too large\ncreates child issues\nlabel: status:split"| S2["Tracking issue\n(children re-enter at needs-plan)"]
     E -->|opens PR, label agent-generated| F["Tester agent\n04-agent-test.yml"]
     F -->|"tests green\nlabel: status:tests-passed"| G["Validator agent\n05-agent-validate.yml"]
     F -->|tests still red| F2["label: status:tests-failed\n(human/manual intervention)"]
@@ -57,7 +59,10 @@ default token.
 |---|---|---|
 | `status:needs-plan` | New spec, plan not started | Issue template default |
 | `status:plan-review` | Plan posted, waiting on PM | Planner agent |
-| `status:ready-for-dev` | Plan approved | Approval gate |
+| `status:plan-approved` | PM approved, Splitter deciding whether to break it up | Approval gate |
+| `status:split` | Plan was split; this issue now tracks its child issues | Splitter agent |
+| `split-child` | Marks an issue created by the Splitter from a larger parent | Splitter agent |
+| `status:ready-for-dev` | Plan approved and right-sized for one Coder run | Splitter agent |
 | `status:in-review` | PR open, moving through test/validate | Coder agent |
 | `status:tests-failed` | Tester couldn't get to green | Tester agent |
 | `status:tests-passed` | Tests green, awaiting validation | Tester agent |
@@ -95,6 +100,11 @@ updates the README/changelog after merge):
   A human (or a `/agent-fix` comment you wire up yourself, mirroring
   `02-agent-plan-approval.yml`) currently decides whether to re-run the
   Coder. Kept manual here rather than building an unbounded fix-retry loop.
+- **A `status:split` tracking issue doesn't auto-close.** When the Splitter
+  breaks a plan into child issues, each child runs the full pipeline on its
+  own (including its own Planner pass and `/approve-plan`), but nothing
+  watches for all children merging to close the parent. A human closes it
+  once its checklist is done.
 - **Merging is always a human action** (per current design) — the Validator
   agent approves the PR review but does not merge it.
 - Cost/runaway control is via `--max-turns` on each `claude_args` block —

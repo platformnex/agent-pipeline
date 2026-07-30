@@ -47,15 +47,43 @@ jobs:
 
             Decide whether this plan is small enough for one Coder agent run, or
             should be split into smaller, independently implementable issues first.
+            Do this with an explicit capacity estimate, not a gut call:
 
-            Rule of thumb: keep it as ONE issue if an experienced engineer could
-            implement every task, write tests for it, and land it as a single
-            coherent PR in one sitting. Lean toward splitting if the Tasks section
-            has more than ~5 substantial tasks, the tasks span multiple areas of
-            the codebase that don't need to land together, or the Planner's own
-            Risk/complexity line says Large. When genuinely unsure, don't split —
-            only split when the win is clear, since every split adds a full
-            Planner + human-approval cycle per child issue.
+            1. Capacity: the Coder agent (03-agent-implement.yml) runs with
+               --max-turns 60 — every Read/Write/Edit/Bash call is one turn. Apply
+               a 0.75 safety margin for the debugging/iteration overhead a first
+               estimate never fully captures, giving an effective per-issue budget
+               of 45 turns. (If you ever change Coder's --max-turns, update this
+               number here too — it's intentionally duplicated, not computed.)
+
+            2. Estimate the turns this plan's Tasks section will actually cost:
+               - Fixed overhead per issue (reading context, running install/build/
+                 test at least once, committing, pushing, opening the PR): ~8 turns.
+               - Per task, by size:
+                 - trivial (single-line/config/constant change): ~2 turns
+                 - small (one function/method, one file, no real new test): ~4 turns
+                 - medium (touches 2-4 files, real logic, needs its own test(s)): ~7 turns
+                 - large (new subsystem/schema/cross-service plumbing, coordinated
+                   tests): ~12 turns
+               Sum these across every task to get estimated_turns.
+
+            3. ratio = estimated_turns / 45.
+               - If ratio <= 1, keep it as ONE issue.
+               - If ratio > 1, split into n = ceil(ratio) child issues — e.g. a plan
+                 estimated at 3.4x becomes 4 children. Partition tasks so each
+                 child's own estimated_turns is roughly estimated_turns / n; balance
+                 by estimated cost, not raw task count. If tightly-coupled tasks
+                 (same file, same data-shape change) would have to be split across
+                 children to hit that balance, keep them together anyway and let
+                 that child run a bit over rather than break coherence.
+               - Exception: if a single task alone is already >= 45 turns and can't
+                 be decomposed without breaking coherence, don't force a bad split —
+                 keep it as its own (child, or the original) issue and say so plainly
+                 in your comment so a human knows it may still hit --max-turns.
+
+            Keep your estimated_turns, ratio, and (if splitting) resulting n
+            somewhere visible — in the split comment if you split, or just in your
+            own reasoning if you don't — so the math is auditable, not vibes.
 
             If you decide NOT to split, just hand off to the Coder as normal:
               gh issue edit ${{ github.event.issue.number }} --remove-label "status:plan-approved" --add-label "status:ready-for-dev"
@@ -63,8 +91,7 @@ jobs:
             shouldn't add noise to the issue.
 
             If you decide TO split:
-              - Partition the Tasks section into 2+ groups, each independently
-                implementable and each satisfying the "one sitting" rule of thumb
+              - Partition the Tasks section into n groups per the balancing rule
                 above. Preserve dependency order — if group B's tasks depend on
                 group A's, say so explicitly in B's issue body instead of silently
                 reordering the work.
@@ -86,8 +113,8 @@ jobs:
                 sub-issue linking wasn't available and the "Split from #N" text
                 references are the only connection, so a human knows to check manually.
               - Post ONE comment on issue #${{ github.event.issue.number }} explaining
-                the plan was split and why, with a checklist linking every child
-                issue you created.
+                the plan was split, including your estimated_turns/ratio/n math,
+                with a checklist linking every child issue you created.
               - gh issue edit ${{ github.event.issue.number }} --remove-label "status:plan-approved" --add-label "status:split"
               - Leave issue #${{ github.event.issue.number }} open — it now serves as
                 a tracking issue for its children. Nothing auto-closes it; a human

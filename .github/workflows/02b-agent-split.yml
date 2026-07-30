@@ -75,6 +75,16 @@ jobs:
                 goal, the specific tasks from this group (quote them from the
                 plan), acceptance criteria, and a line "Split from #${{ github.event.issue.number }}, part <i> of <n>."
                 Record each created issue's number as you go.
+              - Register each child as a real GitHub sub-issue of #${{ github.event.issue.number }}
+                — a plain "#N" mention in the body does NOT create any tracked
+                relationship, it's just text. For each child issue number you created:
+                  child_id=$(gh issue view <child-number> --json id --jq .id)
+                  gh api -X POST repos/{owner}/{repo}/issues/${{ github.event.issue.number }}/sub_issues -F sub_issue_id="$child_id"
+                (sub_issue_id must be the numeric `id` field, not the issue number.)
+                If this repo/org doesn't have the sub-issues feature enabled, this call
+                will fail with a 4xx — in that case note in your final comment that
+                sub-issue linking wasn't available and the "Split from #N" text
+                references are the only connection, so a human knows to check manually.
               - Post ONE comment on issue #${{ github.event.issue.number }} explaining
                 the plan was split and why, with a checklist linking every child
                 issue you created.
@@ -88,5 +98,5 @@ jobs:
             source code, and do not open any PR — this stage only reads the plan and
             manages issues.
           claude_args: |
-            --allowedTools "Read,Write,Bash(gh issue view:*),Bash(gh issue comment:*),Bash(gh issue edit:*),Bash(gh issue create:*)"
+            --allowedTools "Read,Write,Bash(gh issue view:*),Bash(gh issue comment:*),Bash(gh issue edit:*),Bash(gh issue create:*),Bash(gh api:*)"
             --max-turns 25

@@ -55,6 +55,11 @@ jobs:
             errors early. Write tests for new behavior — don't leave that entirely to
             the Tester agent downstream.
 
+            Commit after finishing each task (`git add -A && git commit -m "..."`)
+            instead of saving one big commit for the end. If you run out of turns
+            before finishing every task, whatever you've already committed survives
+            and can be picked up from — don't leave completed work uncommitted.
+
             When implementation is complete:
               git add -A
               git commit -m "..."
@@ -76,3 +81,16 @@ jobs:
           claude_args: |
             --allowedTools "Read,Write,Edit,Bash,Bash(gh issue view:*),Bash(gh issue edit:*),Bash(gh issue comment:*),Bash(gh pr create:*),Bash(git:*)"
             --max-turns 60
+
+      # Runs only if the Coder step above failed (e.g. hit --max-turns without
+      # opening a PR). Without this, the issue is left on status:ready-for-dev
+      # with no comment and no label change — just a red Action run a human
+      # has to notice on their own.
+      - name: Handle Coder failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GH_AUTOMATION_TOKEN }}
+        run: |
+          git push -u origin "agent/issue-${{ github.event.issue.number }}" || true
+          gh issue comment ${{ github.event.issue.number }} --body "Coder agent did not finish (see the Action run for details — likely hit \`--max-turns\`). Any completed tasks it committed before stopping were pushed to \`agent/issue-${{ github.event.issue.number }}\`, but no PR was opened. Needs a human to continue the branch manually, or the plan split into smaller issues."
+          gh issue edit ${{ github.event.issue.number }} --remove-label "status:ready-for-dev" --add-label "status:plan-review"

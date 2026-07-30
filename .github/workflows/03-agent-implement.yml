@@ -132,11 +132,19 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GH_AUTOMATION_TOKEN }}
         run: |
-          # claude-code-action reconfigures (and then revokes) its own git
-          # credential for the Coder step's use, leaving this step's `git push`
-          # with a dead token even though GH_TOKEN above is fine for `gh` calls.
-          # Re-point git's credential helper at GH_AUTOMATION_TOKEN explicitly.
-          gh auth setup-git
-          git push -u origin "agent/issue-${{ github.event.issue.number }}" || true
-          gh issue comment ${{ github.event.issue.number }} --body "Coder agent did not finish (see the Action run for details — likely hit \`--max-turns\`). Any completed tasks it committed before stopping were pushed to \`agent/issue-${{ github.event.issue.number }}\`, but no PR was opened. Comment \`/continue\` to resume the Coder on the same branch from where it left off, or split the plan into smaller issues manually."
+          # claude-code-action rewrites the origin remote URL with its own
+          # short-lived token for the Coder step's git operations, then
+          # revokes that token before exiting. `gh auth setup-git` alone does
+          # NOT fix this: git only falls back to a credential helper when the
+          # remote URL has no embedded credentials, and this URL already has
+          # a (now-dead) one — so it fails outright without ever trying the
+          # helper. Overwrite the URL directly instead.
+          git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git"
+          BRANCH="agent/issue-${{ github.event.issue.number }}"
+          if git push -u origin "$BRANCH"; then
+            pushed_msg="pushed to \`$BRANCH\`"
+          else
+            pushed_msg="**could not be pushed** (git push itself failed — see the Action log) so nothing from this run is recoverable"
+          fi
+          gh issue comment ${{ github.event.issue.number }} --body "Coder agent did not finish (see the Action run for details — likely hit \`--max-turns\`). Any completed tasks it committed before stopping were $pushed_msg, but no PR was opened. Comment \`/continue\` to resume the Coder on the same branch from where it left off, or split the plan into smaller issues manually."
           gh issue edit ${{ github.event.issue.number }} --remove-label "status:ready-for-dev" --add-label "status:coder-incomplete"
